@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relógios do Mundo — UP Studio</title>
+<style>
+  :root{
+    --bg:#0d0e11;
+    --surface:#15161a;
+    --line:#272a31;
+    --ink:#e9e7e2;
+    --muted:#8b8e96;
+    --faint:#5b5e66;
+    --copper:#c06a3a;
+    --copper-soft:#d98a5c;
+    --night:#16171b;
+    --day:#363942;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .panel{
+    max-width:1100px;margin:0 auto;
+    border:1px solid var(--line);
+    background:
+      radial-gradient(1200px 400px at 50% -10%, rgba(192,106,58,.07), transparent 60%),
+      var(--bg);
+  }
+  .head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:15px 20px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap;
+  }
+  .mark{font-size:11.5px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);}
+  .mark b{color:var(--copper-soft);font-weight:600;}
+  .utc{
+    font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    font-size:11.5px;color:var(--faint);letter-spacing:.05em;font-variant-numeric:tabular-nums;
+  }
+  .utc span{color:var(--muted);}
+  .board{
+    display:grid;gap:1px;background:var(--line);
+    grid-template-columns:repeat(auto-fill,minmax(196px,1fr));
+  }
+  .toolbar{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:11px 20px;border-bottom:1px solid var(--line);
+  }
+  .btn-add,.btn-reset,.btn-confirm,.btn-cancel{
+    font-family:inherit;cursor:pointer;background:transparent;
+    border:1px solid var(--line);color:var(--ink);
+    font-size:11.5px;letter-spacing:.03em;padding:6px 11px;border-radius:3px;
+    transition:border-color .15s,color .15s;
+  }
+  .btn-add{border-color:var(--copper);color:var(--copper-soft);font-weight:600;}
+  .btn-add:hover{background:rgba(192,106,58,.12);}
+  .btn-reset{color:var(--faint);border-color:transparent;padding:6px 2px;}
+  .btn-reset:hover{color:var(--muted);}
+  .add-form{
+    display:none;align-items:center;gap:8px;flex:1 1 320px;
+  }
+  .add-form.open{display:flex;}
+  #cityInput{
+    flex:1 1 220px;min-width:180px;
+    background:var(--bg);border:1px solid var(--line);color:var(--ink);
+    font-family:inherit;font-size:12.5px;padding:7px 10px;border-radius:3px;
+  }
+  #cityInput:focus{outline:none;border-color:var(--copper);}
+  .btn-confirm{border-color:var(--copper);color:var(--copper-soft);}
+  .btn-confirm:hover{background:rgba(192,106,58,.12);}
+  .add-error{
+    flex-basis:100%;font-size:11px;color:#d97757;display:none;padding-left:2px;
+  }
+  .add-error.show{display:block;}
+  .empty{
+    padding:30px 20px;text-align:center;font-size:12.5px;color:var(--faint);
+  }
+  .clock{
+    position:relative;
+    background:var(--surface);
+    padding:18px 18px 17px;
+    display:flex;flex-direction:column;gap:9px;
+  }
+  .top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .offset{
+    font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--copper-soft);
+  }
+  .remove{
+    position:absolute;top:8px;right:9px;
+    width:18px;height:18px;border:none;background:transparent;cursor:pointer;
+    color:var(--faint);font-size:14px;line-height:1;border-radius:3px;
+    opacity:.45;transition:opacity .15s,color .15s,background .15s;
+  }
+  .remove:hover{opacity:1;color:var(--copper-soft);background:rgba(192,106,58,.12);}
+  .name{margin-top:2px;}
+  .city{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);}
+  .region{display:block;margin-top:3px;font-size:10px;color:var(--faint);letter-spacing:.06em;}
+  .time{
+    font-family:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    font-weight:300;font-size:33px;line-height:1;color:var(--ink);
+    font-variant-numeric:tabular-nums;letter-spacing:.01em;margin-top:2px;
+  }
+  .time .sec{font-size:15px;color:var(--muted);}
+  .date{font-size:11px;color:var(--muted);letter-spacing:.03em;text-transform:capitalize;}
+  .arc{
+    position:relative;height:3px;border-radius:2px;margin-top:5px;
+    background:linear-gradient(90deg,
+      var(--night) 0%, var(--night) 25%,
+      var(--day) 25%, var(--day) 75%,
+      var(--night) 75%, var(--night) 100%);
+  }
+  .dot{
+    position:absolute;top:50%;width:7px;height:7px;border-radius:50%;
+    background:var(--copper);transform:translate(-50%,-50%);
+    box-shadow:0 0 0 2px var(--surface), 0 0 8px rgba(192,106,58,.5);
+    transition:left .6s linear;
+  }
+  .foot{
+    padding:11px 20px;border-top:1px solid var(--line);
+    font-size:10.5px;color:var(--faint);letter-spacing:.04em;line-height:1.5;
+  }
+  @media (max-width:560px){
+    .board{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+    .time{font-size:28px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .dot{transition:none;}
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="head">
+      <div class="mark"><b>UP Studio</b> · Relógios do Mundo</div>
+      <div class="utc"><span>Referência</span> UTC <em id="utc">--:--:--</em></div>
+    </div>
+    <div class="toolbar">
+      <button class="btn-add" id="btnAdd" type="button">+ Adicionar cidade</button>
+      <button class="btn-reset" id="btnReset" type="button">Restaurar padrão</button>
+      <form class="add-form" id="addForm" autocomplete="off">
+        <input type="text" id="cityInput" list="cityOptions" placeholder="Digite a cidade (ex.: Paris, Cingapura, Asia/Tokyo)…">
+        <datalist id="cityOptions"></datalist>
+        <button type="submit" class="btn-confirm">Adicionar</button>
+        <button type="button" class="btn-cancel" id="btnCancel">Cancelar</button>
+      </form>
+      <div class="add-error" id="addError"></div>
+    </div>
+    <div class="board" id="board"></div>
+    <p class="empty" id="empty" hidden>Nenhum relógio na lista. Clique em “+ Adicionar cidade” para começar.</p>
+    <div class="foot">
+      Sincronizado em tempo real com o relógio do dispositivo. Horário de verão ajustado automaticamente por cidade (base de fusos IANA). A faixa clara em cada relógio marca o período diurno (6h–18h) e o ponto de cobre, a posição atual no dia. A lista de cidades fica salva neste navegador — adicione, remova ou restaure o padrão quando quiser.
+    </div>
+  </div>
+
+<script>
+  // Default panel — restored by "Restaurar padrão"
+  const DEFAULT_CITIES = [
+    { city:'Los Angeles', state:'California',    region:'Estados Unidos',   tz:'America/Los_Angeles' },
+    { city:'Houston',     state:'Texas',         region:'Estados Unidos',   tz:'America/Chicago' },
+    { city:'Detroit',     state:'Michigan',      region:'Estados Unidos',   tz:'America/Detroit' },
+    { city:'Nova York',   state:'Nova York',     region:'Estados Unidos',   tz:'America/New_York' },
+    { city:'São Paulo',   state:'São Paulo',     region:'Brasil',           tz:'America/Sao_Paulo' },
+    { city:'Londres',     state:'Inglaterra',    region:'Reino Unido',      tz:'Europe/London' },
+    { city:'Estocolmo',   state:'Estocolmo',     region:'Suécia',           tz:'Europe/Stockholm' },
+    { city:'Essen',       state:'Renânia do Norte-Vestfália', region:'Alemanha', tz:'Europe/Berlin' },
+    { city:'Dubai',       state:'Dubai',         region:'Emirados Árabes',  tz:'Asia/Dubai' },
+    { city:'Cingapura',   state:null,            region:'Singapura',        tz:'Asia/Singapore' },
+    { city:'Tóquio',      state:'Tóquio',        region:'Japão',            tz:'Asia/Tokyo' },
+  ];
+
+  // Curated library used for autocomplete + name matching when adding a city.
+  // Not exhaustive on purpose — anything missing here can still be added by
+  // typing its raw IANA zone (e.g. "Europe/Paris"), which the form accepts too.
+  // "state" holds each city's first-level administrative division (state,
+  // province, canton, prefecture…). Left out only for true city-states /
+  // territories with no such layer (Singapore, Hong Kong).
+  const CITY_LIBRARY = [
+    {city:'Los Angeles', state:'California', region:'Estados Unidos', tz:'America/Los_Angeles'},
+    {city:'San Francisco', state:'California', region:'Estados Unidos', tz:'America/Los_Angeles'},
+    {city:'Seattle', state:'Washington', region:'Estados Unidos', tz:'America/Los_Angeles'},
+    {city:'Denver', state:'Colorado', region:'Estados Unidos', tz:'America/Denver'},
+    {city:'Houston', state:'Texas', region:'Estados Unidos', tz:'America/Chicago'},
+    {city:'Chicago', state:'Illinois', region:'Estados Unidos', tz:'America/Chicago'},
+    {city:'Dallas', state:'Texas', region:'Estados Unidos', tz:'America/Chicago'},
+    {city:'Detroit', state:'Michigan', region:'Estados Unidos', tz:'America/Detroit'},
+    {city:'Nova York', state:'Nova York', region:'Estados Unidos', tz:'America/New_York'},
+    {city:'Miami', state:'Flórida', region:'Estados Unidos', tz:'America/New_York'},
+    {city:'Washington D.C.', state:'Distrito de Colúmbia', region:'Estados Unidos', tz:'America/New_York'},
+    {city:'Boston', state:'Massachusetts', region:'Estados Unidos', tz:'America/New_York'},
+    {city:'Toronto', state:'Ontário', region:'Canadá', tz:'America/Toronto'},
+    {city:'Vancouver', state:'Colúmbia Britânica', region:'Canadá', tz:'America/Vancouver'},
+    {city:'Cidade do México', state:'Cidade do México', region:'México', tz:'America/Mexico_City'},
+    {city:'São Paulo', state:'São Paulo', region:'Brasil', tz:'America/Sao_Paulo'},
+    {city:'Rio de Janeiro', state:'Rio de Janeiro', region:'Brasil', tz:'America/Sao_Paulo'},
+    {city:'Brasília', state:'Distrito Federal', region:'Brasil', tz:'America/Sao_Paulo'},
+    {city:'Campinas', state:'São Paulo', region:'Brasil', tz:'America/Sao_Paulo'},
+    {city:'Buenos Aires', state:'Cidade Autônoma de Buenos Aires', region:'Argentina', tz:'America/Argentina/Buenos_Aires'},
+    {city:'Santiago', state:'Região Metropolitana', region:'Chile', tz:'America/Santiago'},
+    {city:'Bogotá', state:'Distrito Capital', region:'Colômbia', tz:'America/Bogota'},
+    {city:'Lima', state:'Lima', region:'Peru', tz:'America/Lima'},
+    {city:'Londres', state:'Inglaterra', region:'Reino Unido', tz:'Europe/London'},
+    {city:'Dublin', state:'Leinster', region:'Irlanda', tz:'Europe/Dublin'},
+    {city:'Lisboa', state:'Lisboa', region:'Portugal', tz:'Europe/Lisbon'},
+    {city:'Porto', state:'Porto', region:'Portugal', tz:'Europe/Lisbon'},
+    {city:'Madri', state:'Comunidade de Madrid', region:'Espanha', tz:'Europe/Madrid'},
+    {city:'Barcelona', state:'Catalunha', region:'Espanha', tz:'Europe/Madrid'},
+    {city:'Paris', state:'Île-de-France', region:'França', tz:'Europe/Paris'},
+    {city:'Amsterdã', state:'Holanda do Norte', region:'Holanda', tz:'Europe/Amsterdam'},
+    {city:'Bruxelas', state:'Região de Bruxelas-Capital', region:'Bélgica', tz:'Europe/Brussels'},
+    {city:'Essen', state:'Renânia do Norte-Vestfália', region:'Alemanha', tz:'Europe/Berlin'},
+    {city:'Berlim', state:'Berlim', region:'Alemanha', tz:'Europe/Berlin'},
+    {city:'Frankfurt', state:'Hesse', region:'Alemanha', tz:'Europe/Berlin'},
+    {city:'Munique', state:'Baviera', region:'Alemanha', tz:'Europe/Berlin'},
+    {city:'Zurique', state:'Zurique', region:'Suíça', tz:'Europe/Zurich'},
+    {city:'Viena', state:'Viena', region:'Áustria', tz:'Europe/Vienna'},
+    {city:'Milão', state:'Lombardia', region:'Itália', tz:'Europe/Rome'},
+    {city:'Roma', state:'Lácio', region:'Itália', tz:'Europe/Rome'},
+    {city:'Estocolmo', state:'Estocolmo', region:'Suécia', tz:'Europe/Stockholm'},
+    {city:'Oslo', state:'Oslo', region:'Noruega', tz:'Europe/Oslo'},
+    {city:'Copenhague', state:'Região da Capital', region:'Dinamarca', tz:'Europe/Copenhagen'},
+    {city:'Helsinque', state:'Uusimaa', region:'Finlândia', tz:'Europe/Helsinki'},
+    {city:'Varsóvia', state:'Mazóvia', region:'Polônia', tz:'Europe/Warsaw'},
+    {city:'Praga', state:'Praga', region:'República Tcheca', tz:'Europe/Prague'},
+    {city:'Atenas', state:'Ática', region:'Grécia', tz:'Europe/Athens'},
+    {city:'Istambul', state:'Istambul', region:'Turquia', tz:'Europe/Istanbul'},
+    {city:'Moscou', state:'Moscou', region:'Rússia', tz:'Europe/Moscow'},
+    {city:'Dubai', state:'Dubai', region:'Emirados Árabes', tz:'Asia/Dubai'},
+    {city:'Abu Dhabi', state:'Abu Dhabi', region:'Emirados Árabes', tz:'Asia/Dubai'},
+    {city:'Doha', state:'Doha', region:'Catar', tz:'Asia/Qatar'},
+    {city:'Riade', state:'Riade', region:'Arábia Saudita', tz:'Asia/Riyadh'},
+    {city:'Tel Aviv', state:'Tel Aviv', region:'Israel', tz:'Asia/Jerusalem'},
+    {city:'Cairo', state:'Cairo', region:'Egito', tz:'Africa/Cairo'},
+    {city:'Joanesburgo', state:'Gauteng', region:'África do Sul', tz:'Africa/Johannesburg'},
+    {city:'Lagos', state:'Lagos', region:'Nigéria', tz:'Africa/Lagos'},
+    {city:'Nairóbi', state:'Nairóbi', region:'Quênia', tz:'Africa/Nairobi'},
+    {city:'Mumbai', state:'Maharashtra', region:'Índia', tz:'Asia/Kolkata'},
+    {city:'Nova Delhi', state:'Délhi', region:'Índia', tz:'Asia/Kolkata'},
+    {city:'Bangcoc', state:'Bangcoc', region:'Tailândia', tz:'Asia/Bangkok'},
+    {city:'Jacarta', state:'Jacarta', region:'Indonésia', tz:'Asia/Jakarta'},
+    {city:'Cingapura', state:null, region:'Singapura', tz:'Asia/Singapore'},
+    {city:'Kuala Lumpur', state:'Kuala Lumpur', region:'Malásia', tz:'Asia/Kuala_Lumpur'},
+    {city:'Hong Kong', state:null, region:'China', tz:'Asia/Hong_Kong'},
+    {city:'Pequim', state:'Pequim', region:'China', tz:'Asia/Shanghai'},
+    {city:'Xangai', state:'Xangai', region:'China', tz:'Asia/Shanghai'},
+    {city:'Seul', state:'Seul', region:'Coreia do Sul', tz:'Asia/Seoul'},
+    {city:'Tóquio', state:'Tóquio', region:'Japão', tz:'Asia/Tokyo'},
+    {city:'Osaka', state:'Osaka', region:'Japão', tz:'Asia/Tokyo'},
+    {city:'Perth', state:'Austrália Ocidental', region:'Austrália', tz:'Australia/Perth'},
+    {city:'Sydney', state:'Nova Gales do Sul', region:'Austrália', tz:'Australia/Sydney'},
+    {city:'Melbourne', state:'Victória', region:'Austrália', tz:'Australia/Melbourne'},
+    {city:'Brisbane', state:'Queensland', region:'Austrália', tz:'Australia/Brisbane'},
+    {city:'Auckland', state:'Auckland', region:'Nova Zelândia', tz:'Pacific/Auckland'},
+  ];
+
+  const STORAGE_KEY = 'up_world_clocks_v2';
+  const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const LIB_DISPLAY = CITY_LIBRARY.map(c => ({ ...c, label: `${c.city} — ${c.region}` }));
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return DEFAULT_CITIES.map(c => ({...c}));
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+      return DEFAULT_CITIES.map(c => ({...c}));
+    }catch(e){
+      return DEFAULT_CITIES.map(c => ({...c}));
+    }
+  }
+  function saveState(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.cities)); }catch(e){ /* private mode etc — ignore */ }
+  }
+
+  const state = { cities: loadState() };
+
+  const board = document.getElementById('board');
+  const empty = document.getElementById('empty');
+  const utcEl = document.getElementById('utc');
+  const btnAdd = document.getElementById('btnAdd');
+  const btnReset = document.getElementById('btnReset');
+  const addForm = document.getElementById('addForm');
+  const cityInput = document.getElementById('cityInput');
+  const cityOptions = document.getElementById('cityOptions');
+  const addError = document.getElementById('addError');
+  const btnCancel = document.getElementById('btnCancel');
+
+  cityOptions.innerHTML = LIB_DISPLAY.map(c => `<option value="${c.label}">`).join('');
+
+  function clean(s){ return s.replace(/\.$/, ''); }
+  function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function showError(msg){
+    addError.textContent = msg;
+    addError.classList.add('show');
+  }
+  function hideError(){
+    addError.classList.remove('show');
+    addError.textContent = '';
+  }
+  function openForm(){
+    addForm.classList.add('open');
+    btnAdd.hidden = true;
+    cityInput.value = '';
+    hideError();
+    cityInput.focus();
+  }
+  function closeForm(){
+    addForm.classList.remove('open');
+    btnAdd.hidden = false;
+    hideError();
+  }
+
+  function findEntry(query){
+    const q = norm(query);
+    if (!q) return null;
+    let hit = LIB_DISPLAY.find(c => norm(c.label) === q) ||
+              LIB_DISPLAY.find(c => norm(c.city) === q) ||
+              LIB_DISPLAY.find(c => norm(c.city).startsWith(q));
+    if (hit) return { city: hit.city, region: hit.region, tz: hit.tz, state: hit.state || null };
+
+    // Fallback: accept a raw IANA zone, e.g. "Europe/Paris" or "Pacific/Auckland"
+    if (query.includes('/')) {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: query });
+        const parts = query.split('/');
+        return {
+          city: parts[parts.length - 1].replace(/_/g, ' '),
+          region: parts[0].replace(/_/g, ' '),
+          tz: query,
+          state: null,
+        };
+      } catch (e) { /* invalid zone string — falls through */ }
+    }
+    return null;
+  }
+
+  function addCity(raw){
+    const entry = findEntry(raw);
+    if (!entry){
+      showError('Cidade não encontrada. Tente o nome em português ou o fuso IANA (ex.: Europe/Paris).');
+      return;
+    }
+    const dup = state.cities.some(c => c.tz === entry.tz && norm(c.city) === norm(entry.city));
+    if (dup){
+      showError(`${entry.city} já está na lista.`);
+      return;
+    }
+    state.cities.push(entry);
+    saveState();
+    render();
+    closeForm();
+  }
+
+  function removeCity(index){
+    state.cities.splice(index, 1);
+    saveState();
+    render();
+  }
+
+  btnAdd.addEventListener('click', openForm);
+  btnCancel.addEventListener('click', closeForm);
+  addForm.addEventListener('submit', e => {
+    e.preventDefault();
+    addCity(cityInput.value);
+  });
+  btnReset.addEventListener('click', () => {
+    state.cities = DEFAULT_CITIES.map(c => ({...c}));
+    saveState();
+    render();
+    closeForm();
+  });
+
+  let slots = [];
+
+  function render(){
+    board.innerHTML = '';
+    empty.hidden = state.cities.length > 0;
+
+    slots = state.cities.map((c, i) => {
+      const fmt = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: c.tz, hourCycle: 'h23',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        weekday: 'short', day: '2-digit', month: 'short',
+        timeZoneName: 'shortOffset'
+      });
+
+      const el = document.createElement('div');
+      el.className = 'clock';
+      const sub = c.state ? `${c.state}, ${c.region}` : c.region;
+      el.innerHTML = `
+        <button class="remove" type="button" title="Remover ${c.city}" aria-label="Remover ${c.city}">×</button>
+        <div class="top">
+          <span class="offset"></span>
+        </div>
+        <div class="name">
+          <span class="city">${c.city}</span>
+          <span class="region">${sub}</span>
+        </div>
+        <div class="time"><span class="hm"></span><span class="sec"></span></div>
+        <div class="date"></div>
+        <div class="arc"><span class="dot"></span></div>
+      `;
+      el.querySelector('.remove').addEventListener('click', () => removeCity(i));
+      board.appendChild(el);
+
+      return {
+        fmt,
+        offset: el.querySelector('.offset'),
+        hm:     el.querySelector('.hm'),
+        sec:    el.querySelector('.sec'),
+        date:   el.querySelector('.date'),
+        dot:    el.querySelector('.dot'),
+      };
+    });
+
+    tick();
+  }
+
+  function tick(){
+    const now = new Date();
+
+    // Reference UTC clock in the header
+    const u = new Intl.DateTimeFormat('pt-BR', {
+      timeZone:'UTC', hourCycle:'h23', hour:'2-digit', minute:'2-digit', second:'2-digit'
+    }).formatToParts(now);
+    const uo = Object.fromEntries(u.map(p => [p.type, p.value]));
+    utcEl.textContent = `${uo.hour}:${uo.minute}:${uo.second}`;
+
+    for (const s of slots){
+      const parts = Object.fromEntries(s.fmt.formatToParts(now).map(p => [p.type, p.value]));
+      s.hm.textContent  = `${parts.hour}:${parts.minute}`;
+      s.sec.textContent = `:${parts.second}`;
+      s.date.textContent = `${cap(clean(parts.weekday))}, ${parts.day} ${clean(parts.month)}`;
+      s.offset.textContent = (parts.timeZoneName || '').replace('GMT', 'UTC');
+
+      const h = +parts.hour, m = +parts.minute, sec = +parts.second;
+      const frac = (h*3600 + m*60 + sec) / 86400;
+      s.dot.style.left = (frac * 100) + '%';
+    }
+  }
+
+  render();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
